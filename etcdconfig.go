@@ -252,6 +252,7 @@ func OnUpdate(etcdCli etcd.Client, key string, fn func(val string)) {
       for {
          resp, err = w.Next(ctx)
          if err == nil {
+            Goose.Logf(3,"Updating config variable %s = %s",key,resp.Node.Value)
             fn(resp.Node.Value)
          } else {
             Goose.Logf(1,"Error updating config variable %s (%s)",key,err)
