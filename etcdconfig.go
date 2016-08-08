@@ -1,6 +1,7 @@
 package etcdconfig
 
 import (
+   "io"
    "fmt"
    "regexp"
    "io/ioutil"
@@ -107,6 +108,44 @@ func SetConfig(cfg string, etcdcli etcd.Client, key string) error {
       Goose.Setter.Logf(1,"Error parsing config (%s)\n",err)
       return err
    }
+
+   err = rSetConfig("/" + key,config,etcd.NewKeysAPI(etcdcli))
+   if err != nil {
+      Goose.Setter.Logf(1,"Error setting config cluster (%s)\n",err)
+      return err
+   }
+
+   return nil
+}
+
+func SetConfigFromReader(cfg io.Reader, etcdcli etcd.Client, key string) error {
+   var err         error
+   var configbuf []byte
+   var config       map[string]interface{}
+
+   configbuf, err = ioutil.ReadAll(cfg)
+   if err != nil {
+      Goose.Setter.Logf(1,"Error reading config file (%s)\n",err)
+      return err
+   }
+
+   err = json.Unmarshal(configbuf, &config);
+   if err != nil {
+      Goose.Setter.Logf(1,"Error parsing config (%s)\n",err)
+      return err
+   }
+
+   err = rSetConfig("/" + key,config,etcd.NewKeysAPI(etcdcli))
+   if err != nil {
+      Goose.Setter.Logf(1,"Error setting config cluster (%s)\n",err)
+      return err
+   }
+
+   return nil
+}
+
+func SetConfigFromMap(config map[string]interface{}, etcdcli etcd.Client, key string) error {
+   var err         error
 
    err = rSetConfig("/" + key,config,etcd.NewKeysAPI(etcdcli))
    if err != nil {
