@@ -16,11 +16,13 @@ var reArrayIndex *regexp.Regexp = regexp.MustCompile("/\\[([0-9]+)\\]$")
 var reMapIndex   *regexp.Regexp = regexp.MustCompile("/([^/]*)$")
 
 
-var Goose struct {
+type EtcdconfigG struct {
    Setter  goose.Alert
    Getter  goose.Alert
    Updater goose.Alert
 }
+
+var Goose EtcdconfigG
 
 
 func rSetConfig(path string, config map[string]interface{}, etcdcli etcd.KeysAPI) error {
@@ -44,11 +46,13 @@ func rSetConfig(path string, config map[string]interface{}, etcdcli etcd.KeysAPI
    for key, value = range config {
       switch value.(type) {
          case map[string]interface{} :
+            Goose.Setter.Logf(5,"Found %s/%s=%q => map[string]interface{}", path, key, value.(map[string]interface{}))
             err = rSetConfig(path + "/" + key, value.(map[string]interface{}), etcdcli)
             if err != nil {
                return err
             }
          case []interface{} :
+            Goose.Setter.Logf(5,"Found %s/%s=%q => []interface{}", path, key, value.([]interface{}))
             resp, err = etcdcli.Set(ctx, fmt.Sprintf("%s/%s",path,key), "", optDir)
             if err != nil {
                Goose.Setter.Fatalf(1,"Error setting configuration, creating diretory.2 (%s/%s): %s",path,key,err)
@@ -57,17 +61,19 @@ func rSetConfig(path string, config map[string]interface{}, etcdcli etcd.KeysAPI
             for key2, value2 = range value.([]interface{}) {
                switch value2.(type) {
                   case map[string]interface{} :
+                     Goose.Setter.Logf(5,"Found %s/%s=%q => []interface{map[string]interface{}}", path, key, value2.(map[string]interface{}))
                      err = rSetConfig(fmt.Sprintf("%s/%s/[%d]",path,key,key2), value2.(map[string]interface{}), etcdcli)
                      if err != nil {
                         return err
                      }
                   case string :
+                     Goose.Setter.Logf(5,"Found %s/%s=%q => []interface{string}", path, key, value2.(string))
                      resp, err = etcdcli.Set(ctx, fmt.Sprintf("%s/%s/[%d]",path,key,key2), value2.(string), nil)
                      if err != nil {
                         Goose.Setter.Fatalf(1,"Error setting configuration.1: %s",err)
                      } else {
                         // print common key info
-                        Goose.Setter.Logf(1,"Configuration set. Metadata: %q\n", resp)
+                        Goose.Setter.Logf(5,"Configuration set. Metadata: %q\n", resp)
                      }
                   default:
                      Goose.Setter.Fatalf(1,"Invalid type: key=%s, key2=%d, value=%v",key,key2,value2)
@@ -80,7 +86,7 @@ func rSetConfig(path string, config map[string]interface{}, etcdcli etcd.KeysAPI
                Goose.Setter.Fatalf(5,"path:%s,   key:%s     Metadata: %q",path, key, resp)
             } else {
                // print common key info
-               Goose.Setter.Logf(5,"Configuration set. Metadata: %q", resp)
+               Goose.Setter.Logf(5,"Configuration %s/%s=%s set. Metadata: %q", path, key, value.(string), resp)
             }
 
          default:
@@ -283,6 +289,29 @@ func SetKey(etcdcli etcd.Client, key string, value string) error {
 }
 
 func OnUpdate(etcdCli etcd.Client, key string, fn func(val string)) {
+   var kapi           etcd.KeysAPI
+   var ctx            context.Context
+
+   kapi = etcd.NewKeysAPI(etcdCli)
+   ctx  = context.Background()
+
+   go func (w etcd.Watcher) {
+      var err error
+      var resp         *etcd.Response
+
+      for {
+         resp, err = w.Next(ctx)
+         if err == nil {
+            Goose.Updater.Logf(3,"Updating config variable %s = %s",key,resp.Node.Value)
+            fn(resp.Node.Value)
+         } else {
+            Goose.Updater.Logf(1,"Error updating config variable %s (%s)",key,err)
+         }
+      }
+   }(kapi.Watcher(key,nil))
+}
+
+func OnUpdateIFace(etcdCli etcd.Client, key string, fn func(val interface{})) {
    var kapi           etcd.KeysAPI
    var ctx            context.Context
 
