@@ -275,7 +275,7 @@ func SetKey(etcdcli etcd.Client, key string, value string) error {
    var ctx           context.Context
 
    ctx    = context.Background()
-
+   Goose.Setter.Logf(6,"Entering SetKey /%s <- %#v", key, value)
    resp, err = etcd.NewKeysAPI(etcdcli).Set(ctx, "/" + key, value, nil)
    if err != nil {
       Goose.Setter.Logf(1,"Error setting configuration.2: %s",err)
@@ -308,7 +308,7 @@ func OnUpdate(etcdCli etcd.Client, key string, fn func(val string)) {
             Goose.Updater.Logf(1,"Error updating config variable %s (%s)",key,err)
          }
       }
-   }(kapi.Watcher(key,nil))
+   }(kapi.Watcher("/" + key,nil))
 }
 
 func OnUpdateIFace(etcdCli etcd.Client, key string, fn func(val interface{})) {
@@ -331,7 +331,31 @@ func OnUpdateIFace(etcdCli etcd.Client, key string, fn func(val interface{})) {
             Goose.Updater.Logf(1,"Error updating config variable %s (%s)",key,err)
          }
       }
-   }(kapi.Watcher(key,nil))
+   }(kapi.Watcher("/" + key,nil))
 }
+
+func OnUpdateTree(etcdCli etcd.Client, key string, fn func(key string, val interface{}, action string)) {
+   var kapi           etcd.KeysAPI
+   var ctx            context.Context
+
+   kapi = etcd.NewKeysAPI(etcdCli)
+   ctx  = context.Background()
+
+   go func (w etcd.Watcher) {
+      var err error
+      var resp         *etcd.Response
+
+      for {
+         resp, err = w.Next(ctx)
+         if err == nil {
+            Goose.Updater.Logf(3,"Updating (%s) config variable %s = %s", resp.Action, key, resp.Node.Value)
+            fn(resp.Node.Key, resp.Node.Value, resp.Action)
+         } else {
+            Goose.Updater.Logf(1,"Error updating config variable %s (%s)",key,err)
+         }
+      }
+   }(kapi.Watcher("/" + key,&etcd.WatcherOptions{Recursive:true}))
+}
+
 
 
