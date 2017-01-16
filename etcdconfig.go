@@ -3,7 +3,9 @@ package etcdconfig
 import (
    "io"
    "fmt"
+   "sort"
    "regexp"
+//   "reflect"
    "io/ioutil"
    "encoding/json"
    "golang.org/x/net/context"
@@ -11,10 +13,11 @@ import (
    etcd "github.com/coreos/etcd/client"
 )
 
-
-var reArrayIndex *regexp.Regexp = regexp.MustCompile("/\\[([0-9]+)\\]$")
-var reMapIndex   *regexp.Regexp = regexp.MustCompile("/([^/]*)$")
-
+type watchReq struct {
+   key string
+   id  string
+   resp chan bool
+}
 
 type EtcdconfigG struct {
    Setter  goose.Alert
@@ -24,6 +27,10 @@ type EtcdconfigG struct {
 
 var Goose EtcdconfigG
 
+var reArrayIndex *regexp.Regexp = regexp.MustCompile("/\\[([0-9]+)\\]$")
+var reMapIndex   *regexp.Regexp = regexp.MustCompile("/([^/]*)$")
+var keysWatched map[string][]string
+var wreq chan watchReq
 
 func rSetConfig(path string, config map[string]interface{}, etcdcli etcd.KeysAPI) error {
    var key           string
@@ -279,7 +286,8 @@ func SetKey(etcdcli etcd.Client, key string, value string) error {
    resp, err = etcd.NewKeysAPI(etcdcli).Set(ctx, "/" + key, value, nil)
    if err != nil {
       Goose.Setter.Logf(1,"Error setting configuration.2: %s",err)
-      Goose.Setter.Fatalf(5,"key:%s     Metadata: %q", key, resp)
+      Goose.Setter.Logf(5,"key:%s     Metadata: %q", key, resp)
+      panic(fmt.Sprintf("Error setting configuration: %s",err))
    } else {
       // print common key info
       Goose.Setter.Logf(5,"Configuration set. Metadata: %q", resp)
@@ -288,9 +296,109 @@ func SetKey(etcdcli etcd.Client, key string, value string) error {
    return nil
 }
 
-func OnUpdate(etcdCli etcd.Client, key string, fn func(val string)) {
+
+func watcherChecker(req chan watchReq) {
+   var reqKey watchReq
+   var ok bool
+   var j int
+   var kw []string
+
+   for {
+      reqKey = <-req
+      if reqKey.key == "" {
+         return
+      }
+
+      if kw, ok = keysWatched[reqKey.key]; !ok {
+         reqKey.resp<- false
+         keysWatched[reqKey.key] = []string{reqKey.id}
+      }
+
+      j = sort.Search(len(kw), func(i int) bool { return kw[i] >= reqKey.id })
+      if j < len(kw) && kw[j] == reqKey.id {
+         // reqKey.fn is present at kw[j]
+         reqKey.resp <- true
+      } else {
+         reqKey.resp <- false
+         // reqKey.id is not present at kw[j]
+         // but j is the index where it would be inserted.
+         if j==len(kw) {
+            keysWatched[reqKey.key] = append(kw,reqKey.id)
+         } else {
+            kw = append(kw,reqKey.id)
+            copy(kw[j+1:],kw[j:len(kw)-1])
+            kw[j] = reqKey.id
+            keysWatched[reqKey.key] = kw
+         }
+      }
+   }
+}
+
+func chkWatcher(key string, id string) bool {
+   var resp chan bool
+
+   resp = make(chan bool,1)
+   wreq<- watchReq{key:key, id:id, resp: resp}
+
+   return <-resp
+}
+
+func OnUpdate(etcdCli etcd.Client, key string, fn func(val string), id ...interface{}) {
    var kapi           etcd.KeysAPI
    var ctx            context.Context
+   var sid            string
+
+   if len(id) > 0 {
+      switch id[0].(type) {
+         case string:
+            sid = id[0].(string)
+         default:
+            Goose.Updater.Logf(2,"Ignoring wrong parameter type for key %s (%#v)",key,id[0])
+            return
+      }
+   }
+
+   if chkWatcher(key, sid) {
+      return
+   }
+
+   kapi = etcd.NewKeysAPI(etcdCli)
+   ctx  = context.Background()
+
+   go func (w etcd.Watcher) {
+      var err error
+      var resp         *etcd.Response
+
+      for {
+         resp, err = w.Next(ctx)
+         if err == nil {
+            Goose.Updater.Logf(3,"Updating config variable %s = %s", key, resp.Node.Value)
+            fn(resp.Node.Value)
+         } else {
+            Goose.Updater.Logf(1,"Error updating config variable %s (%s)",key,err)
+         }
+      }
+   }(kapi.Watcher("/" + key,nil))
+}
+
+func OnUpdateIFace(etcdCli etcd.Client, key string, fn func(val interface{}), id ...interface{}) {
+   var kapi           etcd.KeysAPI
+   var ctx            context.Context
+   var sid            string
+
+   if len(id) > 0 {
+      switch id[0].(type) {
+         case string:
+            sid = id[0].(string)
+         default:
+            Goose.Updater.Logf(2,"Ignoring wrong parameter type for key %s (%#v)",key,id[0])
+            return
+      }
+   }
+
+   if chkWatcher(key, sid) {
+      return
+   }
 
    kapi = etcd.NewKeysAPI(etcdCli)
    ctx  = context.Background()
@@ -311,32 +419,24 @@ func OnUpdate(etcdCli etcd.Client, key string, fn func(val string)) {
    }(kapi.Watcher("/" + key,nil))
 }
 
-func OnUpdateIFace(etcdCli etcd.Client, key string, fn func(val interface{})) {
+func OnUpdateTree(etcdCli etcd.Client, key string, fn func(key string, val interface{}, action string), id ...interface{}) {
    var kapi           etcd.KeysAPI
    var ctx            context.Context
+   var sid            string
 
-   kapi = etcd.NewKeysAPI(etcdCli)
-   ctx  = context.Background()
-
-   go func (w etcd.Watcher) {
-      var err error
-      var resp         *etcd.Response
-
-      for {
-         resp, err = w.Next(ctx)
-         if err == nil {
-            Goose.Updater.Logf(3,"Updating config variable %s = %s",key,resp.Node.Value)
-            fn(resp.Node.Value)
-         } else {
-            Goose.Updater.Logf(1,"Error updating config variable %s (%s)",key,err)
-         }
+   if len(id) > 0 {
+      switch id[0].(type) {
+         case string:
+            sid = id[0].(string)
+         default:
+            Goose.Updater.Logf(2,"Ignoring wrong parameter type for key %s (%#v)",key,id[0])
+            return
       }
-   }(kapi.Watcher("/" + key,nil))
-}
+   }
 
-func OnUpdateTree(etcdCli etcd.Client, key string, fn func(key string, val interface{}, action string)) {
-   var kapi           etcd.KeysAPI
-   var ctx            context.Context
+   if chkWatcher(key, sid) {
+      return
+   }
 
    kapi = etcd.NewKeysAPI(etcdCli)
    ctx  = context.Background()
@@ -358,4 +458,10 @@ func OnUpdateTree(etcdCli etcd.Client, key string, fn func(key string, val inter
 }
 
 
+
+func init() {
+   keysWatched = map[string][]string{}
+   wreq = make(chan watchReq,1)
+   go watcherChecker(wreq)
+}
 
