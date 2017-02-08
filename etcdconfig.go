@@ -4,6 +4,9 @@ import (
    "io"
    "fmt"
    "sort"
+   "math"
+//   "time"
+//   "reflect"
    "regexp"
 //   "reflect"
    "io/ioutil"
@@ -93,11 +96,61 @@ func rSetConfig(path string, config map[string]interface{}, etcdcli etcd.KeysAPI
                Goose.Setter.Fatalf(5,"path:%s,   key:%s     Metadata: %q",path, key, resp)
             } else {
                // print common key info
-               Goose.Setter.Logf(5,"Configuration %s/%s=%s set. Metadata: %q", path, key, value.(string), resp)
+               Goose.Setter.Logf(5,"Configuration.2 %s/%s=%s set. Metadata: %q", path, key, value.(string), resp)
             }
 
+         case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+            resp, err = etcdcli.Set(ctx, path + "/" + key, fmt.Sprintf("%d",value), nil)
+            if err != nil {
+               Goose.Setter.Logf(1,"Error setting configuration.3: %s",err)
+               Goose.Setter.Fatalf(5,"path:%s,   key:%s     Metadata: %q",path, key, resp)
+            } else {
+               // print common key info
+               Goose.Setter.Logf(5,"Configuration.3 %s/%s=%d set. Metadata: %q", path, key, value, resp)
+            }
+
+
+         case float32:
+            if math.Floor(float64(value.(float32))) == float64(value.(float32)) {
+               resp, err = etcdcli.Set(ctx, path + "/" + key, fmt.Sprintf("%.0f",math.Floor(float64(value.(float32)))), nil)
+            } else {
+               resp, err = etcdcli.Set(ctx, path + "/" + key, fmt.Sprintf("%f",value.(float32)), nil)
+            }
+            if err != nil {
+               Goose.Setter.Logf(1,"Error setting configuration.4: %s",err)
+               Goose.Setter.Fatalf(5,"path:%s,   key:%s     Metadata: %q",path, key, resp)
+            } else {
+               // print common key info
+               Goose.Setter.Logf(5,"Configuration.4 %s/%s=%c set. Metadata: %q", path, key, value, resp)
+            }
+
+         case float64:
+            if math.Floor(value.(float64)) == value.(float64) {
+               resp, err = etcdcli.Set(ctx, path + "/" + key, fmt.Sprintf("%.0f",math.Floor(value.(float64))), nil)
+            } else {
+               resp, err = etcdcli.Set(ctx, path + "/" + key, fmt.Sprintf("%f",value.(float64)), nil)
+            }
+            if err != nil {
+               Goose.Setter.Logf(1,"Error setting configuration.4: %s",err)
+               Goose.Setter.Fatalf(5,"path:%s,   key:%s     Metadata: %q",path, key, resp)
+            } else {
+               // print common key info
+               Goose.Setter.Logf(5,"Configuration.4 %s/%s=%c set. Metadata: %q", path, key, value, resp)
+            }
+
+
          default:
-            Goose.Setter.Fatalf(1,"Invalid type: key=%s, value=%v",key,value)
+            resp, err = etcdcli.Set(ctx, path + "/" + key, fmt.Sprintf("%s",value), nil)
+            if err != nil {
+               Goose.Setter.Logf(1,"Error setting configuration.5: %s",err)
+               Goose.Setter.Fatalf(5,"path:%s,   key:%s     Metadata: %q",path, key, resp)
+            } else {
+               // print common key info
+               Goose.Setter.Logf(5,"Configuration.5 %s/%s=%s set. Metadata: %q", path, key, value, resp)
+            }
+
+
+//            Goose.Setter.Fatalf(1,"Invalid type: key=%s, value=%#v, valuetype:%#v",key,value,reflect.TypeOf(value))
 
       }
    }
