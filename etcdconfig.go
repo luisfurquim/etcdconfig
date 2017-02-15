@@ -135,7 +135,7 @@ func rSetConfig(path string, config map[string]interface{}, etcdcli etcd.KeysAPI
                Goose.Setter.Fatalf(5,"path:%s,   key:%s     Metadata: %q",path, key, resp)
             } else {
                // print common key info
-               Goose.Setter.Logf(5,"Configuration.4 %s/%s=%c set. Metadata: %q", path, key, value, resp)
+               Goose.Setter.Logf(5,"Configuration.5 %s/%s=%c set. Metadata: %q", path, key, value, resp)
             }
 
 
@@ -146,7 +146,7 @@ func rSetConfig(path string, config map[string]interface{}, etcdcli etcd.KeysAPI
                Goose.Setter.Fatalf(5,"path:%s,   key:%s     Metadata: %q",path, key, resp)
             } else {
                // print common key info
-               Goose.Setter.Logf(5,"Configuration.5 %s/%s=%s set. Metadata: %q", path, key, value, resp)
+               Goose.Setter.Logf(5,"Configuration.6 %s/%s=%s set. Metadata: %q", path, key, value, resp)
             }
 
 
