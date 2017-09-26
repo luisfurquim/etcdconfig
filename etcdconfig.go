@@ -309,7 +309,7 @@ func GetConfig(etcdcli etcd.Client, key string) (interface{}, interface{}, error
 
    resp, err = etcd.NewKeysAPI(etcdcli).Get(context.Background(), "/" + key, &etcd.GetOptions{Recursive:true})
    if err != nil {
-      Goose.Getter.Logf(1,"Error fetching configuration: %s",err)
+      Goose.Getter.Logf(1,"Error fetching configuration for %s: %s", "/" + key, err)
       return nil, nil, err
    }
 
