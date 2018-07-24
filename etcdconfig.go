@@ -5,6 +5,7 @@ import (
    "fmt"
    "sort"
    "math"
+   "errors"
 //   "time"
 //   "reflect"
    "regexp"
@@ -34,6 +35,7 @@ var reArrayIndex *regexp.Regexp = regexp.MustCompile("/\\[([0-9]+)\\]$")
 var reMapIndex   *regexp.Regexp = regexp.MustCompile("/([^/]*)$")
 var keysWatched map[string][]string
 var wreq chan watchReq
+var ErrIndex = errors.New("Error invalid index.")
 
 func rSetConfig(path string, config map[string]interface{}, etcdcli etcd.KeysAPI) error {
    var key           string
@@ -158,6 +160,55 @@ func rSetConfig(path string, config map[string]interface{}, etcdcli etcd.KeysAPI
    return nil
 }
 
+func Set(etcdcli etcd.KeysAPI, path, key, typ string) error {
+	var err 		error
+	var resp		*etcd.Response
+	var ctx     context.Context
+	
+	switch typ {
+		case "string": 
+			resp, err = etcdcli.Set(ctx, path + "/" + key, "", nil)
+         if err != nil {
+				Goose.Setter.Logf(1,"Error setting configuration to string type: %s",err)
+            Goose.Setter.Logf(1,"path:%s,   key:%s     Metadata: %q",path, key, resp)
+            return err
+         } else {
+               // print common key info
+               Goose.Setter.Logf(1,"Configuration type string %s/%s set. Metadata: %q", path, key, resp)
+         }
+		case "number":
+			resp, err = etcdcli.Set(ctx, path + "/" + key, "", nil)
+         if err != nil {
+				Goose.Setter.Logf(1,"Error setting configuration to number type: %s",err)
+            Goose.Setter.Logf(1,"path:%s,   key:%s     Metadata: %q",path, key, resp)
+         } else {
+				// print common key info
+            Goose.Setter.Logf(1,"Configuration type number %s/%s set. Metadata: %q", path, key, resp)
+        }
+		case "boolean":
+			resp, err = etcdcli.Set(ctx, path + "/" + key, "", nil)
+         if err != nil {
+				Goose.Setter.Logf(1,"Error setting configuration to boolean type: %s",err)
+            Goose.Setter.Logf(1,"path:%s,   key:%s     Metadata: %q",path, key, resp)
+            return err
+         } else {
+				// print common key info
+            Goose.Setter.Logf(1,"Configuration type boolean %s/%s set. Metadata: %q", path, key, resp)
+			}
+		default:
+			resp, err = etcdcli.Set(ctx, path + "/" + key, "", nil)
+         if err != nil {
+				Goose.Setter.Logf(1,"Error setting configuration to default: %s",err)
+            Goose.Setter.Logf(1,"path:%s,   key:%s     Metadata: %q",path, key, resp)
+            return err
+         } else {
+               // print common key info
+               Goose.Setter.Logf(1,"Configuration default %s/%s set. Metadata: %q", path, key, resp)
+         }
+     }//ends switch
+     return nil
+}
+
 func SetConfig(cfg string, etcdcli etcd.Client, key string) error {
    var err         error
    var configbuf []byte
@@ -263,7 +314,8 @@ func rGetConfig(node *etcd.Node) (interface{}, interface{}, error) {
    } else {
       matched = reMapIndex.FindStringSubmatch(node.Key)
       if len(matched) <= 1  {
-         Goose.Getter.Fatalf(1,"Error invalid index")
+         Goose.Getter.Logf(1,"Error invalid index")
+         return nil, nil, ErrIndex
       }
       index = matched[1]
    }
