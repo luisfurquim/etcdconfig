@@ -176,38 +176,38 @@ func Set(etcdcli etcd.KeysAPI, path, key, typ string) error {
             return err
          } else {
                // print common key info
-               Goose.Setter.Logf(1,"Configuration type string %s/%s set. Metadata: %q", path, key, resp)
+               Goose.Setter.Logf(2,"Configuration type string %s/%s set. Metadata: %q", path, key, resp)
          }
 		case "number":
-			Goose.Setter.Logf(1,"Key to set: %s\n", "/"+ path + "/" + key)
+			Goose.Setter.Logf(5,"Key to set: %s\n", "/"+ path + "/" + key)
 			resp, err = etcdcli.Set(ctx, "/"+ path + "/" + key, fmt.Sprintf("%d",0), nil)
          if err != nil {
 				Goose.Setter.Logf(1,"Error setting configuration to number type: %s",err)
             Goose.Setter.Logf(1,"path:%s,   key:%s     Metadata: %q",path, key, resp)
          } else {
 				// print common key info
-            Goose.Setter.Logf(1,"Configuration type number %s/%s set. Metadata: %q", path, key, resp)
+            Goose.Setter.Logf(2,"Configuration type number %s/%s set. Metadata: %q", path, key, resp)
         }
 		case "boolean":
-			Goose.Setter.Logf(1,"Key to set: %s\n", "/"+ path + "/" + key)
-			resp, err = etcdcli.Set(ctx, "/"+ path + "/" + key, fmt.Sprintf("%s","true"), nil)
+			Goose.Setter.Logf(5,"Key to set: %s\n", "/"+ path + "/" + key)
+			resp, err = etcdcli.Set(ctx, "/"+ path + "/" + key, fmt.Sprintf("%t","true"), nil)
          if err != nil {
 				Goose.Setter.Logf(1,"Error setting configuration to boolean type: %s",err)
             Goose.Setter.Logf(1,"path:%s,   key:%s     Metadata: %q",path, key, resp)
             return err
          } else {
 				// print common key info
-            Goose.Setter.Logf(1,"Configuration type boolean %s/%s set. Metadata: %q", path, key, resp)
+            Goose.Setter.Logf(2,"Configuration type boolean %s/%s set. Metadata: %q", path, key, resp)
 			}
 		default:
-			resp, err = etcdcli.Set(ctx, "/"+ path + "/" + key, fmt.Sprintf("%s",""), nil)
+			resp, err = etcdcli.Set(ctx, "/"+ path + "/" + key, "", nil)
          if err != nil {
 				Goose.Setter.Logf(1,"Error setting configuration to default: %s",err)
             Goose.Setter.Logf(1,"path:%s,   key:%s     Metadata: %q",path, key, resp)
             return err
          } else {
                // print common key info
-               Goose.Setter.Logf(1,"Configuration default %s/%s set. Metadata: %q", path, key, resp)
+               Goose.Setter.Logf(2,"Configuration default %s/%s set. Metadata: %q", path, key, resp)
          }
      }//ends switch
      return nil
