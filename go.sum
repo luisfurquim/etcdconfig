@@ -1,0 +1,4 @@
+github.com/luisfurquim/goose v0.0.0-20201207195701-3cbdfe9e38da h1:r/7B62h+ncpoI9hfpqLWHeLZeZwW1RLvibB4x6HWN1E=
+github.com/luisfurquim/goose v0.0.0-20201207195701-3cbdfe9e38da/go.mod h1:koolrwDt83ePklQY7OdWLRBV93CSJScdnDjpVb9QTgs=
+golang.org/x/net v0.7.0 h1:rJrUqqhjsgNp7KqAIc25s9pZnjU7TUcSY7HcVZjdn1g=
+golang.org/x/net v0.7.0/go.mod h1:2Tu9+aMcznHK/AK1HMvgo6xiTLG5rD5rZLDS+rp2Bjs=
