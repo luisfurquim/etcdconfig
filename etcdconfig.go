@@ -15,7 +15,7 @@ import (
    "golang.org/x/net/context"
    "github.com/luisfurquim/goose"
 //   etcd "github.com/coreos/etcd/client"
-   etcd github.com/etcd-io/etcd/client/v2
+   etcd "github.com/etcd-io/etcd/client/v2"
 )
 
 type watchReq struct {
